@@ -12,7 +12,7 @@ import { connectToDatabase, disconnectFromDatabase } from './utils/db';
 const app: Application = express();
 
 const corsOptions = {
-  origin: 'http://localhost:5173',
+  origin: 'https://money-handler-front.vercel.app',
   credentials: true,
   optionSuccessStatus: 200,
 };
