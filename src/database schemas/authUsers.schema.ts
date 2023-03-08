@@ -1,6 +1,8 @@
-import { Schema, model } from 'mongoose';
-import { AuthUser } from '../DTOs/auth.dto';
+import { Schema, model, Model } from 'mongoose';
+
 import { MODEL_NAMES } from './modelNames';
+import { AuthUser } from '../DTOs/auth.dto';
+import { ROLES } from '../utils/constants';
 
 const AuthUserSchema = new Schema<AuthUser>(
   {
@@ -18,14 +20,30 @@ const AuthUserSchema = new Schema<AuthUser>(
     },
     email_verified: {
       type: Boolean,
-      required: true,
+      default: false,
     },
     password: {
       type: String,
       required: true,
     },
+    access_token: {
+      type: String,
+      unique: true,
+      default: null,
+    },
+    refresh_token: {
+      type: String,
+      unique: true,
+      default: null,
+    },
+    roles: {
+      type: String,
+      enum: Object.values(ROLES),
+      default: ROLES.USER,
+    },
   },
   { timestamps: true }
 );
 
-export default model<AuthUser>(MODEL_NAMES.authUsers, AuthUserSchema);
+const AuhUserModel: Model<AuthUser> = model(MODEL_NAMES.authUsers, AuthUserSchema);
+export default AuhUserModel;

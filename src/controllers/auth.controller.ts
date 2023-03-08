@@ -1,31 +1,39 @@
 import { NextFunction, Request, Response } from 'express';
-// db schemas
-import AuthTokensSchema from '../database schemas/authTokens.schema';
-import AuthUsersSchema from '../database schemas/authUsers.schema';
-import { AddAuthUser } from '../DTOs/auth.dto';
+
+import { AuthUser, LoginUser, RegisterUser } from '../DTOs/auth.dto';
+import { MongoResWithId } from '../DTOs/common';
 import authService from '../services/auth.service';
 import { customResponse } from '../utils/customResponse';
 
 export default {
-  login: async (req: Request, res: Response, next: NextFunction) => {
+  login: async (
+    req: Request<{}, {}, LoginUser>,
+    res: Response<{}, Record<'authUser', MongoResWithId<AuthUser>>>,
+    next: NextFunction
+  ) => {
     try {
-      const { _id, password: hashedPassword } = res.locals.authUser;
+      const { password: hashedPassword } = res.locals.authUser;
       const { password, email } = req.body;
 
       const isPasswordValid = await authService.comparePasswords(password, hashedPassword);
 
       if (!isPasswordValid) {
-        customResponse(res, 401, 'Invalid email or password');
+        customResponse(res, 400, 'Invalid email or password');
         return;
       }
 
-      const tokens = authService.generateAuthTokens({ email });
+      const user = await authService.addUserTokens(email);
 
-      const response = await AuthTokensSchema.create({
-        userId: _id,
-        ...tokens,
-      });
-      customResponse(res, 200, 'Logged in successfully', response, 1);
+      if (user) {
+        res.cookie('isAuthorised', true, {
+          expires: new Date(Date.now() + 60 * 60 * 1000),
+          httpOnly: false,
+        });
+        customResponse(res, 200, 'Logged in successfully', user, 1);
+        return;
+      }
+
+      customResponse(res, 400, 'Unknown client error');
       return;
     } catch (error) {
       customResponse(res, 500, 'Interval server error: error in logination process');
@@ -34,30 +42,60 @@ export default {
     }
   },
 
-  register: async (req: Request<{}, {}, AddAuthUser>, res: Response, next: NextFunction) => {
+  register: async (req: Request<{}, {}, RegisterUser>, res: Response, next: NextFunction) => {
     try {
-      const { name, email, password } = req.body;
-      const isUserRegistered = await AuthUsersSchema.findOne({ email });
+      const authUser = await authService.addUser(req.body);
 
-      if (isUserRegistered) {
-        customResponse(res, 400, 'User is already registered');
+      if (authUser) {
+        customResponse(res, 200, 'User registered successfully', authUser, 1);
         return;
       }
 
-      const hashedPassword = await authService.hashPassword(password);
-      const authUser = await AuthUsersSchema.create({
-        name,
-        email,
-        password: hashedPassword,
-        email_verified: false,
-      });
-
-      customResponse(res, 200, 'User registered successfully', authUser, 1);
+      customResponse(res, 400, 'Unknown client error');
       return;
     } catch (error) {
       customResponse(res, 500, 'Interval server error: error in registration process');
       console.error(error);
       next(error);
     }
+  },
+
+  logout: async (req: Request, res: Response<{}, Record<'accessToken', string>>, next: NextFunction) => {
+    try {
+      const { accessToken } = res.locals;
+      const removedTokens = await authService.removeUserTokens(accessToken);
+
+      customResponse(res, 200, 'Logged out succesfully', removedTokens, 1);
+    } catch (error) {
+      customResponse(res, 500, 'Interval server error: error in logout process');
+      console.error(error);
+      next(error);
+    }
+  },
+
+  resetTokens: async (req: Request, res: Response<{}, Record<'refreshToken', string>>, next: NextFunction) => {
+    try {
+      const { refreshToken } = res.locals;
+      const authUser = await authService.refreshUserTokens(refreshToken);
+
+      if (!authUser) {
+        customResponse(res, 400, 'Unknown client error');
+        return;
+      }
+      const tokens = { accessToken: authUser.access_token, refreshToken: authUser.refresh_token };
+      customResponse(res, 201, 'Tokens updated successfully', tokens, 1);
+    } catch (error) {
+      console.error(error);
+      customResponse(res, 500, 'Interval server error: error in resetting tokens');
+      next(error);
+    }
+  },
+
+  getCurrentAuthUser: async (req: Request, res: Response<{}, Record<'accessToken', string>>, next: NextFunction) => {
+    try {
+      const { accessToken } = res.locals;
+      const user = await authService.findAuthUserByAccessToken(accessToken);
+      customResponse(res, 200, 'Got user successfully', user, 1);
+    } catch (error) {}
   },
 };

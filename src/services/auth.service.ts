@@ -1,20 +1,40 @@
-import bcrypt from "bcrypt";
-import jwt, { JwtPayload } from "jsonwebtoken";
-
-import config from "../utils/configs";
+import { Types } from 'mongoose';
+import { RegisterUser } from '../DTOs/auth.dto';
+import passwordHelper from '../helpers/password.helper';
+import AuthUsersSchema from '../database schemas/authUsers.schema';
+import tokenService from './token.service';
 
 export default {
-  hashPassword: async (password: string) => await bcrypt.hash(password, 10),
-  comparePasswords: async (password: string, hashedPassword: string) =>
-    await bcrypt.compare(password, hashedPassword),
+  addUser: async (addAuthUser: RegisterUser) => {
+    const hashedPassword = await passwordHelper.hashPassword(addAuthUser.password);
+    return AuthUsersSchema.create({
+      name: addAuthUser.name,
+      email: addAuthUser.email,
+      password: hashedPassword,
+    });
+  },
 
-  generateAuthTokens: (payload: JwtPayload = {}) => {
-    const access_token = jwt.sign(payload, config.ACCESS_TOKEN_SECRET, {
-      expiresIn: "15m",
-    });
-    const refresh_token = jwt.sign(payload, config.REFRESH_TOKEN_SECRET, {
-      expiresIn: "10d",
-    });
-    return { access_token, refresh_token };
+  addUserTokens: (email: string) => {
+    const tokens = tokenService.generateAuthTokens({ email });
+    return AuthUsersSchema.findOneAndUpdate({ email }, { ...tokens }, { new: true });
+  },
+
+  removeUserTokens: (accessToken: string) =>
+    AuthUsersSchema.findOneAndUpdate(
+      { access_token: accessToken },
+      { access_token: null, refresh_token: null },
+      { new: true }
+    ),
+
+  comparePasswords: (password: string, hashedPassword: string) =>
+    passwordHelper.comparePasswords(password, hashedPassword),
+
+  findAuthUserByEmail: (email: string) => AuthUsersSchema.findOne({ email }),
+
+  findAuthUserByAccessToken: (accessToken: string) => AuthUsersSchema.findOne({ access_token: accessToken }),
+
+  refreshUserTokens: (oldRefreshToken: string) => {
+    const tokens = tokenService.generateAuthTokens();
+    return AuthUsersSchema.findOneAndUpdate({ refresh_token: oldRefreshToken }, { ...tokens }, { new: true });
   },
 };
