@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
-    "dev": "nodemon ./src/index.ts"
+    "dev": "nodemon ./src/index.ts",
+    "start": "set NODE_ENV=production && ts-node ./src/index.ts"
   },
   "license": "MIT",
   "dependencies": {
