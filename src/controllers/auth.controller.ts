@@ -27,6 +27,8 @@ export default {
       if (user) {
         res.cookie('isAuthorised', true, {
           expires: new Date(Date.now() + 60 * 60 * 1000),
+          sameSite: 'none',
+          secure: true,
           httpOnly: false,
         });
         customResponse(res, 200, 'Logged in successfully', user, 1);

@@ -11,8 +11,10 @@ import { connectToDatabase, disconnectFromDatabase } from './utils/db';
 
 const app: Application = express();
 
+const origin = process.env.NODE_ENV ? process.env.FRONTEND_PROD_URL : process.env.FRONTEND_DEV_URL;
+
 const corsOptions = {
-  origin: 'https://money-handler-front.vercel.app',
+  origin,
   credentials: true,
   optionSuccessStatus: 200,
 };
