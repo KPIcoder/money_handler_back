@@ -7,7 +7,9 @@ import cors from 'cors';
 import authRouter from './routes/auth.router';
 import userRouter from './routes/user.router';
 import config from './utils/configs';
-import { connectToDatabase, disconnectFromDatabase } from './utils/db';
+import { pool } from './utils/db';
+import transactionRouter from './routes/transaction.router';
+// import { connectToDatabase, disconnectFromDatabase } from './utils/db';
 
 const app: Application = express();
 
@@ -26,21 +28,25 @@ app.use(express.json());
 
 app.use('/auth', authRouter);
 app.use('/user', userRouter);
+app.use('/transaction', transactionRouter);
 
-const server = app.listen(config.PORT, async () => await connectToDatabase());
+app.listen(config.PORT, async () => {
+  const users = await pool.query('select * from f_user');
+  console.log(users.rows);
+});
 
 // --------------------------------------------
 
-const signals = ['SIGTERM', 'SIGINT'];
+// const signals = ['SIGTERM', 'SIGINT'];
 
-function gracefulShutdown(signal: string) {
-  process.on(signal, async () => {
-    server.close();
-    await disconnectFromDatabase();
-    process.exit(0);
-  });
-}
+// function gracefulShutdown(signal: string) {
+//   process.on(signal, async () => {
+//     server.close();
+//     await disconnectFromDatabase();
+//     process.exit(0);
+//   });
+// }
 
-for (let i = 0; i < signals.length; i++) {
-  gracefulShutdown(signals[i]);
-}
+// for (let i = 0; i < signals.length; i++) {
+//   gracefulShutdown(signals[i]);
+// }
